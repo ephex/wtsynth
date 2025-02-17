@@ -17,6 +17,7 @@ const RELEASE_MS: u128 = 2000;
 const WAVE_TYPE_SINE: u8 = 0;
 const WAVE_TYPE_SAW: u8 = 1;
 const WAVE_TYPE_SQUARE: u8 = 2;
+const WAVE_TYPE_TRI: u8 = 3;
 
 struct NoteData {
     note: std::thread::JoinHandle<()>,
@@ -29,6 +30,52 @@ impl NoteData {
             note: note,
             shared: shared,
         }
+    }
+}
+
+struct Filter {
+    cutoff: f32,
+    resonance: f32,
+    feedback: f32,
+    buf0: f32,
+    buf1: f32,
+}
+
+impl Filter {
+    fn new(cutoff: f32, resonance: f32, feedback: f32) -> Filter {
+        return Filter {
+            cutoff: cutoff,
+            resonance: resonance,
+            feedback: feedback,
+            buf0: 0.0,
+            buf1: 1.0,
+        }
+    }
+
+    fn calculate_feedback(&mut self) {
+        self.feedback = self.resonance + self.resonance/(1.0 - self.cutoff);
+    }
+
+    fn set_cutoff(&mut self, cutoff: f32) {
+        self.cutoff = cutoff;
+        self.calculate_feedback();
+    }
+
+    fn set_resonance(&mut self, resonance: f32) {
+        self.resonance = resonance;
+        self.calculate_feedback();
+    }
+
+    fn set_feedback(&mut self, feedback: f32) {
+        self.feedback = feedback;
+    }
+
+    fn process(&mut self, input: f32) -> f32 {
+        self.buf0 += self.cutoff * (input - self.buf0);
+        self.buf1 += self.cutoff * (self.buf0 - self.buf1);
+        return self.buf1;
+        //return input - self.buf0;
+        //return self.buf0 - self.buf1;
     }
 }
 
@@ -47,11 +94,13 @@ struct WavetableOscillator {
     sustain: f32,
     release: u16,
     shared: Arc<Mutex<f32>>,
+    prev_sample: f32,
+    filter: Filter,
 }
 
 
 impl WavetableOscillator {
-    fn new(sample_rate: u32, wave_table: Vec<f32>, shared: Arc<Mutex<f32>>) -> WavetableOscillator {
+    fn new(sample_rate: u32, wave_table: Vec<f32>, shared: Arc<Mutex<f32>>, filter_cutoff: f32, filter_resonance: f32) -> WavetableOscillator {
         return WavetableOscillator {
             note_on: true,
             note_on_time: SystemTime::now(),
@@ -67,6 +116,8 @@ impl WavetableOscillator {
             sustain: 0.0,
             release: 0,
             shared: shared,
+            prev_sample: 0.0,
+            filter: Filter::new(filter_cutoff, filter_resonance, 0.0)
         }
     }
 
@@ -171,7 +222,11 @@ impl WavetableOscillator {
         let sample = self.lerp();
         self.index += self.index_increment;
         self.index %= self.wave_table.len() as f32;
-        return self.get_amplitude() * sample;
+        //return self.get_amplitude() * sample;
+        let ampl = self.get_amplitude();
+        let filtered = self.filter.process(sample);
+        return ampl * filtered;
+        //return ampl * sample;
     }
 
     fn lerp(&mut self) -> f32 {
@@ -263,6 +318,16 @@ fn wavetable_square() -> Vec<f32> {
     return wave_table;
 }
 
+fn wavetable_tri() -> Vec<f32> {
+    let wave_table_size = 64;
+    let mut wave_table: Vec<f32> = Vec::with_capacity(wave_table_size);
+    for n in 0..wave_table_size {
+        wave_table.push(1.0 - 2.0 * (n as f32 / wave_table_size as f32));
+    }
+    println!("Wave table tri {:?}", wave_table);
+    return wave_table;
+}
+
 fn wavetable_main(wave_table_type: u8, frequency: f32, velocity: f32, shared: Arc<Mutex<f32>>) -> thread::JoinHandle<()> {
     let note = std::thread::spawn(move ||  {
         let wave_table: Vec<f32> = match wave_table_type {
@@ -279,14 +344,14 @@ fn wavetable_main(wave_table_type: u8, frequency: f32, velocity: f32, shared: Ar
                 wavetable_sine()
             }
         };
-        let mut oscillator = WavetableOscillator::new(44100, wave_table, Arc::clone(&shared));
+        let mut oscillator = WavetableOscillator::new(44100, wave_table, Arc::clone(&shared), 0.2, 1.0);
         oscillator.set_frequency(frequency);
         oscillator.set_amplitude(velocity/127.0);
         // Set attack, delay, sustain, release.
-        oscillator.set_attack(10);
+        oscillator.set_attack(50);
         oscillator.set_decay(600);
-        oscillator.set_sustain(0.2);
-        oscillator.set_release(800);
+        oscillator.set_sustain(0.8);
+        oscillator.set_release(80);
 
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         let _result = stream_handle.play_raw(oscillator.convert_samples());
@@ -350,7 +415,6 @@ fn run() -> Result<(), Box<dyn Error>> {
     // End the note.
     *note_length.lock().unwrap() = 0.0;
 
-
     println!("\nOpening connection");
     // Connection needs to be named to be kept alive.
     let _conn_in = midi_in.connect(
@@ -377,7 +441,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                         // Note on w/ velocity.
                         let shared = Arc::new(Mutex::new(1.0));
                         let note = wavetable_main(
-                            WAVE_TYPE_SAW,
+                            WAVE_TYPE_SINE,
                             440.0 * 2_f32.powf((message[1] as f32 - 69.0)/12.0),
                             message[2] as f32,
                             Arc::clone(&shared)
