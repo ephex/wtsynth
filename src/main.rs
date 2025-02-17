@@ -11,9 +11,6 @@ use std::time::{Duration, SystemTime};
 use midir::Ignore;
 use midir::MidiInput;
 
-const ATTACK_MS: u128 = 2000;
-const RELEASE_MS: u128 = 2000;
-
 const WAVE_TYPE_SINE: u8 = 0;
 const WAVE_TYPE_SAW: u8 = 1;
 const WAVE_TYPE_SQUARE: u8 = 2;
@@ -192,7 +189,6 @@ impl WavetableOscillator {
             if self.release > 0 {
                 match self.note_off_time.elapsed() {
                     Ok(elapsed) => {
-                        //let release_length_ms: u128 = (RELEASE_MS as f32 * self.release) as u128;
                         if elapsed.as_millis() < self.release as u128 {
                             amp *= 1.0 - (elapsed.as_millis() as f32 / self.release as f32);
                         }
@@ -322,7 +318,13 @@ fn wavetable_tri() -> Vec<f32> {
     let wave_table_size = 64;
     let mut wave_table: Vec<f32> = Vec::with_capacity(wave_table_size);
     for n in 0..wave_table_size {
-        wave_table.push(1.0 - 2.0 * (n as f32 / wave_table_size as f32));
+        if n < wave_table_size / 2 {
+            wave_table.push((-4.0 / wave_table_size as f32) * (n as f32) + 1.0);
+        }
+        else {
+            wave_table.push((4.0 / wave_table_size as f32) * (n as f32) - 3.0);
+
+        }
     }
     println!("Wave table tri {:?}", wave_table);
     return wave_table;
@@ -340,24 +342,28 @@ fn wavetable_main(wave_table_type: u8, frequency: f32, velocity: f32, shared: Ar
             WAVE_TYPE_SQUARE => {
                 wavetable_square()
             }
+            WAVE_TYPE_TRI => {
+                wavetable_tri()
+            }
             _ =>  {
                 wavetable_sine()
             }
         };
         let mut oscillator = WavetableOscillator::new(44100, wave_table, Arc::clone(&shared), 0.2, 1.0);
+        let release = 250;
         oscillator.set_frequency(frequency);
         oscillator.set_amplitude(velocity/127.0);
         // Set attack, delay, sustain, release.
-        oscillator.set_attack(50);
+        oscillator.set_attack(150);
         oscillator.set_decay(600);
         oscillator.set_sustain(0.8);
-        oscillator.set_release(80);
+        oscillator.set_release(release);
 
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         let _result = stream_handle.play_raw(oscillator.convert_samples());
         while *shared.lock().unwrap() > 0.0 {}
         // Allow thread to live until release is done.
-        std::thread::sleep(std::time::Duration::from_millis(RELEASE_MS as u64));
+        std::thread::sleep(std::time::Duration::from_millis(release as u64 + 30 as u64));
     });
     return note;
 }
@@ -441,7 +447,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                         // Note on w/ velocity.
                         let shared = Arc::new(Mutex::new(1.0));
                         let note = wavetable_main(
-                            WAVE_TYPE_SINE,
+                            WAVE_TYPE_TRI,
                             440.0 * 2_f32.powf((message[1] as f32 - 69.0)/12.0),
                             message[2] as f32,
                             Arc::clone(&shared)
