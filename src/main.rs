@@ -64,7 +64,6 @@ fn run() -> Result<(), Box<dyn Error>> {
     };
 
     // Start a quiet wave just to kick start the audio subsystem.
-    let note_length = Arc::new(Mutex::new(true));
     let note = Note::new(
         WAVE_TYPE_SINE,
         440.0 * 2_f32.powf(69.0/12.0),

@@ -57,7 +57,7 @@ impl Note {
             let _result = stream_handle.play_raw(oscillator.convert_samples());
             while *note_on.lock().unwrap() {}
             // Allow thread to live until release is done.
-            std::thread::sleep(std::time::Duration::from_millis(note_parameters.release as u64 + 30 as u64));
+            std::thread::sleep(std::time::Duration::from_millis(note_parameters.release as u64 + 300 as u64));
         });
         return Note {
             thread: handle,
