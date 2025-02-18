@@ -46,7 +46,7 @@ impl Note {
         let handle = std::thread::spawn(move ||  {
             let mut oscillator = WavetableOscillator::new(44100, wave_table_type, Arc::clone(&note_on), 0.2, 1.0, pulse_width);
             oscillator.set_frequency(note_parameters.frequency);
-            oscillator.set_amplitude(note_parameters.amplitude);
+            oscillator.set_amplitude(amplitude);
             // Set attack, delay, sustain, release.
             oscillator.set_attack(note_parameters.attack);
             oscillator.set_decay(note_parameters.decay);

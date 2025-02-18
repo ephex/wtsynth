@@ -164,7 +164,7 @@ impl WavetableOscillator {
                         if self.decay > 0 {
                             let elapsed_since_attack = elapsed.as_millis() - self.attack as u128;
                             if elapsed_since_attack < self.decay as u128  {
-                                amp -= (self.amplitude - self.amplitude * self.sustain) * (elapsed_since_attack as f32 / self.decay as f32);
+                                amp -= (amp - amp * self.sustain) * (elapsed_since_attack as f32 / self.decay as f32);
                             }
                             else {
                                 amp *= self.sustain;

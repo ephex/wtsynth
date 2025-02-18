@@ -11,12 +11,17 @@ use std::time::{Duration, SystemTime};
 use midir::Ignore;
 use midir::MidiInput;
 
+use crate::filter::Filter;
+use crate::lfo::Lfo;
 use crate::note::Note;
 use crate::wtoscillator::WavetableOscillator;
 use crate::wtoscillator::{WAVE_TYPE_SAW, WAVE_TYPE_SINE, WAVE_TYPE_SQUARE, WAVE_TYPE_TRI};
 
+pub mod envelope;
 pub mod filter;
+pub mod lfo;
 pub mod note;
+pub mod voice;
 pub mod wtoscillator;
 
 fn main() {
@@ -63,6 +68,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         }
     };
 
+    // Create filter.
+    let filter = Filter::new(0.2, 0.0, 0.0);
+
     // Start a quiet wave just to kick start the audio subsystem.
     let note_length = Arc::new(Mutex::new(true));
     let note = Note::new(
@@ -74,6 +82,9 @@ fn run() -> Result<(), Box<dyn Error>> {
     // End the note.
     note.stop();
 
+    // Create an lfo.
+    let lfo = Lfo::new(120.0);
+
     println!("\nOpening connection");
     // Connection needs to be named to be kept alive.
     let _conn_in = midi_in.connect(
@@ -81,6 +92,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         "midir-read-input",
         move |stamp, message, _| {
             println!("{}: {:?} (len = {})", stamp, message, message.len());
+            println!("lfo val {:?}", lfo.get_value());
             match message.len() {
                 2 => {
                     // Aftertouch?
