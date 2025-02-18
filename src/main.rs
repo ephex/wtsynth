@@ -64,9 +64,11 @@ fn run() -> Result<(), Box<dyn Error>> {
     };
 
     // Start a quiet wave just to kick start the audio subsystem.
+    let note_length = Arc::new(Mutex::new(true));
     let note = Note::new(
         WAVE_TYPE_SINE,
         440.0 * 2_f32.powf(69.0/12.0),
+        0.0,
         0.0
     );
     // End the note.
@@ -96,9 +98,10 @@ fn run() -> Result<(), Box<dyn Error>> {
                         // Note on w/ velocity.
                         let note_on = Arc::new(Mutex::new(true));
                         let note = Note::new(
-                            WAVE_TYPE_TRI,
+                            WAVE_TYPE_SAW,
                             440.0 * 2_f32.powf((message[1] as f32 - 69.0)/12.0),
-                            message[2] as f32 / 127.0
+                            message[2] as f32 / 127.0,
+                            0.0
                         );
                         voices1.insert(message[1], note);
                         // Second voice sub-octave.
@@ -106,7 +109,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                         let note = Note::new(
                             WAVE_TYPE_SQUARE,
                             440.0 * 2_f32.powf((message[1] as f32 - 69.0 - 12.0)/12.0),
-                            message[2] as f32 / 127.0
+                            message[2] as f32 / 127.0,
+                            0.9,
                         );
                         voices2.insert(message[1], note);
                     }

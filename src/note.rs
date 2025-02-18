@@ -40,11 +40,11 @@ pub struct Note {
 }
 
 impl Note {
-    pub fn new(wave_table_type: u8, frequency: f32, amplitude: f32) -> Note {
+    pub fn new(wave_table_type: u8, frequency: f32, amplitude: f32, pulse_width: f32) -> Note {
         let note_on = Arc::new(Mutex::new(true));
         let note_parameters = NoteParameters::new(frequency, amplitude, 100, 100, 0.3, 300, 0.4, 0.0, Arc::clone(&note_on));
         let handle = std::thread::spawn(move ||  {
-            let mut oscillator = WavetableOscillator::new(44100, wave_table_type, Arc::clone(&note_on), 0.2, 1.0);
+            let mut oscillator = WavetableOscillator::new(44100, wave_table_type, Arc::clone(&note_on), 0.2, 1.0, pulse_width);
             oscillator.set_frequency(note_parameters.frequency);
             oscillator.set_amplitude(note_parameters.amplitude);
             // Set attack, delay, sustain, release.

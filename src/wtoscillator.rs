@@ -32,12 +32,12 @@ fn wavetable_saw() -> Vec<f32> {
     return wave_table;
 }
 
-fn wavetable_square() -> Vec<f32> {
+fn wavetable_square(pulse_width: f32) -> Vec<f32> {
     let wave_table_size = 64;
     let mut wave_table: Vec<f32> = Vec::with_capacity(wave_table_size);
     for n in 0..wave_table_size {
         let mut val: f32 = 1.0;
-        if n < wave_table_size / 2 {
+        if n < ((wave_table_size / 2) as f32 * pulse_width) as usize {
             val = -1.0;
         }
         wave_table.push(val);
@@ -80,7 +80,7 @@ pub struct WavetableOscillator {
 
 
 impl WavetableOscillator {
-    pub fn new(sample_rate: u32, wave_table_type: u8, singing: Arc<Mutex<bool>>, filter_cutoff: f32, filter_resonance: f32) -> WavetableOscillator {
+    pub fn new(sample_rate: u32, wave_table_type: u8, singing: Arc<Mutex<bool>>, filter_cutoff: f32, filter_resonance: f32, pulse_width: f32) -> WavetableOscillator {
         let wave_table: Vec<f32> = match wave_table_type {
             WAVE_TYPE_SINE => {
                 wavetable_sine()
@@ -89,7 +89,7 @@ impl WavetableOscillator {
                 wavetable_saw()
             },
             WAVE_TYPE_SQUARE => {
-                wavetable_square()
+                wavetable_square(pulse_width)
             }
             WAVE_TYPE_TRI => {
                 wavetable_tri()
@@ -174,7 +174,6 @@ impl WavetableOscillator {
                             amp *= self.sustain;
                         }
                     }
-
                 }
                 Err(e) => {
                     println!("Error getting amplitude: {:?}", e);
@@ -200,9 +199,7 @@ impl WavetableOscillator {
                     }
                 }
             }
-
         }
-
         return amp;
     }
 
